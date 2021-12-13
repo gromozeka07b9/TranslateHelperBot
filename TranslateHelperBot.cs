@@ -18,6 +18,7 @@ namespace TranslateHelperBot
     {
         private readonly string _token;
         private readonly DictionaryService _dictionaryService;
+        private string botUserName = String.Empty;
 
         public TranslateHelperBot(string token)
         {
@@ -40,8 +41,9 @@ namespace TranslateHelperBot
                 cancellationToken: cts.Token);
 
             var me = await botClient.GetMeAsync(cancellationToken: cts.Token);
+            this.botUserName = me.Username ?? String.Empty;
             Console.WriteLine($"User id:{me.Id}");
-            Console.WriteLine($"User name :{me.FirstName}.");
+            Console.WriteLine($"User name :{me.Username}.");
             Console.WriteLine($"User language code :{me.LanguageCode}.");
             Console.WriteLine($"User CanReadAllGroupMessages :{me.CanReadAllGroupMessages}.");
 
@@ -60,17 +62,29 @@ namespace TranslateHelperBot
 
             var chatId = update.Message.Chat.Id;
             string messageText = update.Message.Text ?? String.Empty;
+            if (messageText.StartsWith("@") && !string.IsNullOrEmpty(this.botUserName))
+            {
+                messageText = messageText.Replace("@" + this.botUserName, "").Trim();
+            }
             if (!string.IsNullOrEmpty(messageText))
             {
                 string directionName = Regex.IsMatch(messageText, @"[^a-z]", RegexOptions.IgnoreCase) ? "ru-en" : "en-ru";
                 var yandexDictionarySchemeResponse = await _dictionaryService.Translate(directionName, messageText);
-                string answer = $"<b>{messageText}</b>  <i>[{yandexDictionarySchemeResponse.def.FirstOrDefault()?.ts}]</i>" + Environment.NewLine;
-                
-                foreach (var def in yandexDictionarySchemeResponse.def)
+                string tsCaption = yandexDictionarySchemeResponse.def.Any() ? $"[{yandexDictionarySchemeResponse.def.FirstOrDefault()?.ts}]" : "";
+                string answer = $"<b>{messageText}</b>  <i>{tsCaption}</i>" + Environment.NewLine;
+
+                if (yandexDictionarySchemeResponse.def.Any())
                 {
-                    answer += def.pos + ": ";
-                    answer += string.Join(", ", def.tr.Select(t => t.text).ToArray());
-                    answer += Environment.NewLine;
+                    foreach (var def in yandexDictionarySchemeResponse.def)
+                    {
+                        answer += def.pos + ": ";
+                        answer += string.Join(", ", def.tr.Select(t => t.text).ToArray());
+                        answer += Environment.NewLine;
+                    }
+                }
+                else
+                {
+                    answer += "Не знаю такого слова.";
                 }
 
                 if (!string.IsNullOrEmpty(answer))
