@@ -18,12 +18,14 @@ namespace TranslateHelperBot
     {
         private readonly string _token;
         private readonly DictionaryService _dictionaryService;
-        private string botUserName = String.Empty;
+        private readonly TranslateService _translateService;
+        private string _botUserName = String.Empty;
 
         public TranslateHelperBot(string token)
         {
             this._token = token;
             this._dictionaryService = new DictionaryService();
+            this._translateService = new TranslateService();
         }
 
         public async Task StartAsync()
@@ -41,14 +43,11 @@ namespace TranslateHelperBot
                 cancellationToken: cts.Token);
 
             var me = await botClient.GetMeAsync(cancellationToken: cts.Token);
-            this.botUserName = me.Username ?? String.Empty;
+            this._botUserName = me.Username ?? String.Empty;
             Console.WriteLine($"User id:{me.Id}");
             Console.WriteLine($"User name :{me.Username}.");
             Console.WriteLine($"User language code :{me.LanguageCode}.");
             Console.WriteLine($"User CanReadAllGroupMessages :{me.CanReadAllGroupMessages}.");
-
-            //DictionaryService srv = new DictionaryService();
-            //await srv.Translate();
         }
         
         async Task HandleUpdateAsync(ITelegramBotClient botClient, Update update, CancellationToken cancellationToken)
@@ -61,10 +60,14 @@ namespace TranslateHelperBot
                 return;
 
             var chatId = update.Message.Chat.Id;
-            string messageText = update.Message.Text ?? String.Empty;
-            if (messageText.StartsWith("@") && !string.IsNullOrEmpty(this.botUserName))
+            string messageText = String.Empty;
+            if ((update.Message.Text ?? String.Empty).StartsWith("@" + this._botUserName) && update?.Message.Chat.Type != ChatType.Private)
             {
-                messageText = messageText.Replace("@" + this.botUserName, "").Trim();
+                messageText = (update?.Message.Text ?? String.Empty).Replace("@" + this._botUserName, "").Trim();
+            }
+            else if(update.Message.Chat.Type == ChatType.Private)
+            {
+                messageText = update.Message.Text ?? String.Empty;
             }
             if (!string.IsNullOrEmpty(messageText))
             {
@@ -85,6 +88,7 @@ namespace TranslateHelperBot
                 else
                 {
                     answer += "Не знаю такого слова.";
+                    //var result  = _translateService.Translate(directionName, messageText);
                 }
 
                 if (!string.IsNullOrEmpty(answer))
